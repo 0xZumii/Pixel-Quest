@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Pixel Quest — Zones + Level Ups + Skills</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#111; --panel:#1e1e1e; --ink:#f2f2f2; --accent:#3cf; --hp:#39d353; --mp:#6ea8fe; --xp:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Arial,sans-serif}
+  h1{margin:16px 0;text-align:center;letter-spacing:.5px}
+  #game{max-width:760px;margin:10px auto;padding:14px;border:3px solid #fff;background:var(--panel);border-radius:12px}
+  #top{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+  #left,#right{flex:1 1 320px}
+  .panel{background:#000a;border:2px solid #fff;padding:10px;border-radius:10px}
+  .row{display:flex;justify-content:space-between;align-items:center;margin:6px 0}
+  .bar{height:10px;background:#333;border-radius:8px;overflow:hidden}
+  .fill{height:100%}
+  .hp{background:var(--hp)}
+  .mp{background:var(--mp)}
+  .xp{background:var(--xp)}
+  .buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  button{background:#222;color:#fff;border:2px solid #fff;border-radius:8px;padding:8px 10px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #log{height:220px;overflow:auto;font-family:ui-monospace, Menlo, monospace;line-height:1.35;background:#050505;border:2px solid #fff;border-radius:10px;padding:10px}
+  #zones{display:flex;gap:8px;flex-wrap:wrap}
+  .zoneBtn{border-color:#999}
+  .forest{background:#214a33}
+  .cave{background:#333945}
+  .castle{background:#45333f}
+  .stat{font-weight:600}
+  .sub{opacity:.85;font-size:.95rem}
+</style>
+</head>
+<body>
+  <h1>Pixel Quest!</h1>
+  <div id="game">
+    <div id="top">
+      <div id="left" class="panel">
+        <div class="row"><div><span class="stat">Zone:</span> <span id="zoneName">Forest</span></div></div>
+        <div class="row"><div class="stat">Enemy:</div><div id="enemyName">–</div></div>
+        <div class="row sub">Enemy HP: <span id="enemyHp">–</span></div>
+        <div class="bar"><div id="enemyHpFill" class="fill hp" style="width:0%"></div></div>
+        <div class="buttons" style="margin-top:12px">
+          <button id="attackBtn">⚔️ Attack</button>
+          <button id="fireballBtn" disabled>🔥 Fireball (10 MP)</button>
+          <button id="healBtn" disabled>💚 Heal (8 MP)</button>
+          <button id="fleeBtn">🏃 Flee</button>
+        </div>
+      </div>
+
+      <div id="right" class="panel">
+        <div class="row"><div class="stat">Hero</div><div>Lvl <span id="lvl">1</span></div></div>
+        <div class="row sub">HP: <span id="hp">100</span>/<span id="maxHp">100</span></div>
+        <div class="bar"><div id="hpFill" class="fill hp" style="width:100%"></div></div>
+        <div class="row sub" style="margin-top:6px">MP: <span id="mp">30</span>/<span id="maxMp">30</span></div>
+        <div class="bar"><div id="mpFill" class="fill mp" style="width:100%"></div></div>
+        <div class="row sub" style="margin-top:6px">XP to next: <span id="xp">0</span>/<span id="xpNext">50</span></div>
+        <div class="bar"><div id="xpFill" class="fill xp" style="width:0%"></div></div>
+        <div class="row sub" style="margin-top:8px">
+          <div>ATK: <span id="atk">10</span></div>
+          <div>DEF: <span id="def">5</span></div>
+          <div>Gold: <span id="gold">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:12px">
+      <div class="row"><div class="stat">Travel</div></div>
+      <div id="zones">
+        <button class="zoneBtn forest" data-zone="Forest">🌲 Forest</button>
+        <button class="zoneBtn cave" data-zone="Cave">🪨 Cave</button>
+        <button class="zoneBtn castle" data-zone="Castle">🏰 Castle</button>
+      </div>
+    </div>
+
+    <div id="log" style="margin-top:12px"></div>
+  </div>
+
+<script>
+/* ========================
+   Core Data & Utilities
+   ======================== */
+const logEl = document.getElementById('log');
+function log(msg){ const p=document.createElement('div'); p.textContent=msg; logEl.appendChild(p); logEl.scrollTop=logEl.scrollHeight; }
+function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+
+/* ========================
+   Player
+   ======================== */
+const player = {
+  name: "Hero",
+  hp: 100, maxHp: 100,
+  mp: 30, maxMp: 30,
+  atk: 10, def: 5,
+  gold: 0,
+  xp: 0,
+  level: 1,
+  xpToNextLevel: 50,
+  skills: [] // "Fireball", "Heal"
+};
+
+/* ========================
+   Zones & Enemies
+   ======================== */
+const zones = {
+  Forest: {
+    enemies: [
+      {name:"Slime", maxHp: 30, atk: 20, gold: 7, xp: 10},
+      {name:"Goblin", maxHp: 32, atk: 25, gold: 11, xp: 15}
+    ],
+    reward: p=>{ const heal=20; p.hp = clamp(p.hp+heal,0,p.maxHp); log(`🍃 Forest boon restores ${heal} HP.`); }
+  },
+  Cave: {
+    enemies: [
+      {name:"Bat", maxHp: 55, atk: 30, gold: 10, xp: 16},
+      {name:"Skeleton", maxHp: 60, atk: 33, gold: 14, xp: 24}
+    ],
+    reward: p=>{ p.atk += 2; log(`💎 Cave shard hardens your edge: +2 ATK.`); }
+  },
+  Castle: {
+    enemies: [
+      {name:"Knight", maxHp: 80, atk: 45, gold: 22, xp: 36},
+      {name:"Dark Mage", maxHp: 85, atk: 50, gold: 26, xp: 44}
+    ],
+    reward: p=>{ p.maxHp += 15; p.hp = p.maxHp; log(`👑 Royal blessing: Max HP +15 and fully healed.`); }
+  }
+};
+
+let currentZone = "Forest";
+let enemy = null;
+
+/* ========================
+   UI Elements
+   ======================== */
+const hpEl = document.getElementById('hp');
+const maxHpEl = document.getElementById('maxHp');
+const hpFill = document.getElementById('hpFill');
+const mpEl = document.getElementById('mp');
+const maxMpEl = document.getElementById('maxMp');
+const mpFill = document.getElementById('mpFill');
+const xpEl = document.getElementById('xp');
+const xpNextEl = document.getElementById('xpNext');
+const xpFill = document.getElementById('xpFill');
+const atkEl = document.getElementById('atk');
+const defEl = document.getElementById('def');
+const goldEl = document.getElementById('gold');
+const lvlEl = document.getElementById('lvl');
+
+const zoneNameEl = document.getElementById('zoneName');
+const enemyNameEl = document.getElementById('enemyName');
+const enemyHpEl = document.getElementById('enemyHp');
+const enemyHpFill = document.getElementById('enemyHpFill');
+
+const attackBtn = document.getElementById('attackBtn');
+const fireballBtn = document.getElementById('fireballBtn');
+const healBtn = document.getElementById('healBtn');
+const fleeBtn = document.getElementById('fleeBtn');
+
+function updateUI(){
+  // Player
+  hpEl.textContent = player.hp;
+  maxHpEl.textContent = player.maxHp;
+  hpFill.style.width = (player.hp/player.maxHp*100)+'%';
+
+  mpEl.textContent = player.mp;
+  maxMpEl.textContent = player.maxMp;
+  mpFill.style.width = (player.mp/player.maxMp*100)+'%';
+
+  xpEl.textContent = player.xp;
+  xpNextEl.textContent = player.xpToNextLevel;
+  xpFill.style.width = (player.xp/player.xpToNextLevel*100)+'%';
+
+  atkEl.textContent = player.atk;
+  defEl.textContent = player.def;
+  goldEl.textContent = player.gold;
+  lvlEl.textContent = player.level;
+
+  // Zone & Enemy
+  zoneNameEl.textContent = currentZone;
+  if(enemy){
+    enemyNameEl.textContent = enemy.name;
+    enemyHpEl.textContent = `${enemy.hp}/${enemy.maxHp}`;
+    enemyHpFill.style.width = (enemy.hp/enemy.maxHp*100)+'%';
+  }else{
+    enemyNameEl.textContent = '–';
+    enemyHpEl.textContent = '–';
+    enemyHpFill.style.width = '0%';
+  }
+
+  // Skill buttons availability
+  fireballBtn.disabled = !player.skills.includes("Fireball") || player.mp < 10 || !enemy;
+  healBtn.disabled = !player.skills.includes("Heal") || player.mp < 8;
+  attackBtn.disabled = !enemy;
+  fleeBtn.disabled = !enemy;
+}
+
+/* ========================
+   Leveling & Skills
+   ======================== */
+function gainXP(amount){
+  player.xp += amount;
+  log(`⭐ Gained ${amount} XP.`);
+  checkLevelUp();
+  updateUI();
+}
+
+function checkLevelUp(){
+  let leveled = false;
+  while(player.xp >= player.xpToNextLevel){
+    player.level++;
+    player.xp -= player.xpToNextLevel;
+    player.xpToNextLevel = Math.floor(player.xpToNextLevel * 1.5);
+
+    // Stat growth
+    player.maxHp += 20;
+    player.hp = player.maxHp;
+    player.maxMp += 10;
+    player.mp = player.maxMp;
+    player.atk += 4;
+    player.def += 2;
+
+    leveled = true;
+    log(`🔥 Level Up! You reached Level ${player.level}. (+20 HP, +10 MP, +4 ATK, +2 DEF)`);
+    unlockSkills();
+  }
+  if(leveled) updateUI();
+}
+
+function unlockSkills(){
+  if(player.level >= 3 && !player.skills.includes("Fireball")){
+    player.skills.push("Fireball");
+    log("🔥 Learned skill: Fireball!");
+  }
+  if(player.level >= 5 && !player.skills.includes("Heal")){
+    player.skills.push("Heal");
+    log("💚 Learned skill: Heal!");
+  }
+  updateUI();
+}
+
+/* ========================
+   Encounters & Actions
+   ======================== */
+function spawnEncounter(){
+  const pool = zones[currentZone].enemies;
+  const base = pool[rand(0, pool.length-1)];
+  enemy = {
+    name: base.name,
+    maxHp: base.maxHp,
+    hp: base.maxHp,
+    atk: base.atk,
+    gold: base.gold,
+    xp: base.xp
+  };
+  log(`⚔️ A ${enemy.name} appears in the ${currentZone}!`);
+  updateUI();
+}
+
+function changeZone(z){
+  currentZone = z;
+  log(`➡️ You travel to the ${z}.`);
+  if(!enemy) spawnEncounter();
+  updateUI();
+}
+
+function playerAttack(){
+  if(!enemy) return;
+  const dmg = Math.max(1, player.atk + rand(0,3));
+  enemy.hp = clamp(enemy.hp - dmg, 0, enemy.maxHp);
+  log(`You strike ${enemy.name} for ${dmg}.`);
+  if(enemy.hp <= 0){
+    winEnemy();
+  }else{
+    setTimeout(enemyTurn, 350);
+  }
+  updateUI();
+}
+
+function castFireball(){
+  if(!enemy) return;
+  if(!player.skills.includes("Fireball")) return;
+  if(player.mp < 10){ log("Not enough MP!"); return; }
+  player.mp -= 10;
+  const dmg = player.atk*2 + rand(2,6);
+  enemy.hp = clamp(enemy.hp - dmg, 0, enemy.maxHp);
+  log(`🔥 Fireball hits ${enemy.name} for ${dmg}!`);
+  if(enemy.hp <= 0){
+    winEnemy();
+  }else{
+    setTimeout(enemyTurn, 350);
+  }
+  updateUI();
+}
+
+function castHeal(){
+  if(!player.skills.includes("Heal")) return;
+  if(player.mp < 8){ log("Not enough MP!"); return; }
+  player.mp -= 8;
+  const heal = 28 + rand(0,8);
+  player.hp = clamp(player.hp + heal, 0, player.maxHp);
+  log(`💚 Heal restores ${heal} HP.`);
+  updateUI();
+}
+
+function flee(){
+  if(!enemy) return;
+  // 75% success to flee
+  if(Math.random() < 0.75){
+    log(`🏃 You fled from the ${enemy.name}.`);
+    enemy = null;
+    updateUI();
+    setTimeout(spawnEncounter, 400);
+  }else{
+    log(`❗ Failed to flee!`);
+    enemyTurn();
+  }
+}
+
+function enemyTurn(){
+  if(!enemy) return;
+  const dmg = Math.max(1, enemy.atk - Math.floor(player.def/3) + rand(0,2));
+  player.hp = clamp(player.hp - dmg, 0, player.maxHp);
+  log(`👹 ${enemy.name} hits you for ${dmg}.`);
+  if(player.hp <= 0){
+    log("☠️ You were defeated... Reload the page to try again.");
+  }
+  updateUI();
+}
+
+function winEnemy(){
+  log(`✅ Defeated ${enemy.name}! +${enemy.gold}g`);
+  player.gold += enemy.gold;
+  gainXP(enemy.xp);
+  zones[currentZone].reward(player);
+  enemy = null;
+  setTimeout(spawnEncounter, 500);
+}
+
+/* ========================
+   Wire UI
+   ======================== */
+document.querySelectorAll('.zoneBtn').forEach(btn=>{
+  btn.addEventListener('click', ()=> changeZone(btn.dataset.zone));
+});
+
+attackBtn.addEventListener('click', playerAttack);
+fireballBtn.addEventListener('click', castFireball);
+healBtn.addEventListener('click', castHeal);
+fleeBtn.addEventListener('click', flee);
+
+// Keyboard: A=attack, F=fireball, H=heal, R=flee, 1/2/3 zones
+document.addEventListener('keydown', (e)=>{
+  const k = e.key.toLowerCase();
+  if(k==='a') playerAttack();
+  if(k==='f') castFireball();
+  if(k==='h') castHeal();
+  if(k==='r') flee();
+  if(k==='1') changeZone('Forest');
+  if(k==='2') changeZone('Cave');
+  if(k==='3') changeZone('Castle');
+});
+
+// Start game
+log("Welcome, Hero! Travel with buttons (1/2/3), fight (A), cast Fireball (F) at Lv3, Heal (H) at Lv5, or Flee (R).");
+spawnEncounter();
+updateUI();
+</script>
+</body>
+</html>
