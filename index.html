@@ -109,22 +109,22 @@ const player = {
 const zones = {
   Forest: {
     enemies: [
-      {name:"Slime", maxHp: 30, atk: 20, gold: 7, xp: 10},
-      {name:"Goblin", maxHp: 32, atk: 25, gold: 11, xp: 15}
+      {name:"Slime", maxHp: 30, atk: 14, gold: 7, xp: 10},
+      {name:"Goblin", maxHp: 32, atk: 18, gold: 11, xp: 15}
     ],
     reward: p=>{ const heal=20; p.hp = clamp(p.hp+heal,0,p.maxHp); log(`🍃 Forest boon restores ${heal} HP.`); }
   },
   Cave: {
     enemies: [
-      {name:"Bat", maxHp: 55, atk: 30, gold: 10, xp: 16},
-      {name:"Skeleton", maxHp: 60, atk: 33, gold: 14, xp: 24}
+      {name:"Bat", maxHp: 55, atk: 22, gold: 10, xp: 16},
+      {name:"Skeleton", maxHp: 60, atk: 25, gold: 14, xp: 24}
     ],
     reward: p=>{ p.atk += 2; log(`💎 Cave shard hardens your edge: +2 ATK.`); }
   },
   Castle: {
     enemies: [
-      {name:"Knight", maxHp: 80, atk: 45, gold: 22, xp: 36},
-      {name:"Dark Mage", maxHp: 85, atk: 50, gold: 26, xp: 44}
+      {name:"Knight", maxHp: 80, atk: 30, gold: 22, xp: 36},
+      {name:"Dark Mage", maxHp: 85, atk: 37, gold: 26, xp: 44}
     ],
     reward: p=>{ p.maxHp += 15; p.hp = p.maxHp; log(`👑 Royal blessing: Max HP +15 and fully healed.`); }
   }
